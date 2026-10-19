@@ -251,51 +251,54 @@ Scott Pilgrim's Precious Little Life (Scott Pilgrim #1) | Precio: 52.29 | Simili
 Acá la similitud es 0.8770, mucho más alta que con `life`, porque las dos palabras solo están en ese título y además aparecen dos veces.
 
 ## Preguntas
+**Pregunta 1 (2 pts). ¿Para qué sirve BeautifulSoup y cómo se diferencia de requests?**
 
-### Pregunta 1: ¿Para qué sirve BeautifulSoup y cómo se diferencia de requests?
+BeautifulSoup funciona como el "analista" que abre ese documento HTML recibido, lo organiza de forma estructurada 
+y permite buscar etiquetas específicas (como enlaces, títulos o tablas) de manera simple. 
 
-requests sirve para hacer la petición HTTP a la página y traer el HTML (con timeout, código de estado, etc.), pero lo trae como un texto, no entiende la estructura de la página. BeautifulSoup sirve para analizar ese HTML y armar un árbol donde se pueden buscar etiquetas por clase o atributo, con `find`, `select` o `select_one`. O sea, requests descarga la página y BeautifulSoup la lee para sacar los datos. Por eso se usan juntos.
+Requests funciona como el "repartidor" o "navegador" que va a internet, toca la puerta del servidor y te trae el documento HTML cerrado
 
-### Pregunta 2: ¿Qué riesgo existe al depender de selectores HTML específicos si el sitio cambia?
 
-Si el sitio cambia el nombre de una clase o la estructura del HTML, los selectores dejan de encontrar los elementos. Puede pasar que el programa se caiga (por ejemplo un `AttributeError` al hacer `.get_text()` sobre `None`), que no se extraiga ningún libro y no salga ningún error, o lo peor, que el selector encuentre otra cosa y se guarden datos malos sin que nadie se dé cuenta. Por eso en el scraper manejamos los `None`, mostramos avisos y revisamos el total y los primeros registros. También ayudaría tener los selectores en un solo lugar para cambiarlos fácil, o usar una API si el sitio tiene una.
+**Pregunta 2 (2 pts). ¿Qué riesgo existe al depender de selectores HTML específicos si el sitio cambia?**
 
-### Pregunta 3: ¿Por qué normalizar los títulos antes de implementar la búsqueda?
+Es la fragilidad del código, lo que provoca que los scripts de automatización, web scraping o pruebas automatizadas
+se rompan fácilmente ante cualquier modificacion/actualizacion.
 
-Para que una misma palabra escrita de distinta forma se tome como la misma. Si no se normaliza, "Life" y "life", o un título con espacios de más, podrían quedar como términos distintos y la búsqueda no encontraría títulos que sí tienen la palabra. Como la consulta también se pasa a minúsculas en `buscar()`, los dos lados quedan iguales, y eso es lo que se ve en T3 (`LIFE` da lo mismo que `life`). TfidfVectorizer igual pasa todo a minúsculas por defecto, pero tener la columna normalizada deja el proceso más claro y no depende de esa opción. El título original queda en `titulo` para mostrarlo en los resultados.
 
-### Pregunta 4: ¿Qué función cumple fit_transform() sobre los títulos y por qué se usa transform() para la consulta?
+**Pregunta 3 (2 pts). ¿Por qué normalizar los títulos antes de implementar la búsqueda?**
 
-`fit_transform()` hace dos cosas con los títulos. El fit aprende el vocabulario (cada palabra distinta es una columna, en nuestro caso 90) y calcula el IDF de cada palabra según en cuántos títulos aparece. El transform convierte cada título en su vector TF-IDF. Así queda la matriz de 20 x 90.
+Porque los usuarios escriben de formas muy variadas e impredecibles, y las bases de datos necesitan un formato
+estandarizado para emparejar la búsqueda con el resultado correcto
 
-Para la consulta se usa solo `transform()` porque tiene que quedar en el mismo espacio que los títulos, con el mismo vocabulario y los mismos IDF, si no no se pueden comparar con la similitud del coseno. Si usáramos `fit_transform()` con la consulta, se crearía un vocabulario nuevo solo con esas palabras y las dimensiones no calzarían con la matriz. Las palabras que no están en el vocabulario se ignoran, por eso `zzxyz123` queda como un vector de puros ceros y no encuentra nada (T2).
 
-### Pregunta 5: Si dos libros obtienen similitudes de 0.75 y 0.20 para la misma consulta, ¿cuál se muestra primero? ¿Qué indica una puntuación cercana a cero?
+**Pregunta 4 (2 pts). En el código entregado, ¿qué función cumple fit_transform() sobre los títulos y por qué se usa transform()
+para la consulta?**
 
-Primero se muestra el de 0.75, porque los resultados se ordenan de mayor a menor similitud (`argsort()[::-1]`). En T1 pasa lo mismo, el de 0.2459 sale antes que el de 0.2250.
+La función fit_transform() sobre los títulos aprende los parámetros necesarios (como el vocabulario, las frecuencias de texto, etc)
+y, al mismo tiempo, aplica esa transformación para convertir los textos en vectores numéricos en un solo paso.
 
-Una puntuación cercana a cero significa que el título tiene muy poco en común con la consulta, por ejemplo comparte una palabra poco importante o la palabra queda "diluida" en un título muy largo. Si es exactamente 0 es porque no comparten ninguna palabra, y el código no muestra esos resultados (`if puntuaciones[i] <= 0: break`). Eso sí, esto es solo por palabras: un puntaje bajo no quiere decir que el significado sea distinto.
+Se usa para evitar por ejemplo las fugas de dato, nos ayuda a mantener la consistencia y simula un entorno real.
 
-### Pregunta 6: ¿Qué limitación tiene buscar solo por palabras presentes en títulos mediante TF-IDF? Proponga una mejora concreta.
 
-La limitación es que solo encuentra palabras exactas, y los títulos tienen pocas palabras. No reconoce plurales, errores de tipeo, sinónimos ni otros idiomas. Lo probamos con nuestros datos:
 
-- `story` no encuentra "Mesaerion: The Best Science Fiction Stories" (singular contra plural)
-- `lif` (mal escrito) no encuentra los títulos con "Life"
-- `vida` no encuentra nada, aunque hay títulos con "Life"
-- `the` sí da resultados con puntajes altos, aunque es una palabra que no dice nada
+**Pregunta 5 (2 pts). Si dos libros obtienen similitudes de 0.75 y 0.20 para la misma consulta, ¿cuál se muestra primero? Explique
+qué indica una puntuación cercana a cero.**
 
-Además, si un libro trata de algo pero no lo dice en el título, nunca va a aparecer en la búsqueda.
+Se muestra primero el libro con una similitud de 0.75.
+Esto se debe a que la mayoría de las métricas utilizadas en la recuperación de información
+operan bajo la  mayor puntuación, mayor es el parecido o la relevancia entre la consulta y el documento. 
+Por lo tanto, el sistema los ordena de forma descendente, dejando el puntaje más alto al principio de la lista.
 
-Mejora: usar n-gramas de caracteres en el vectorizador.
+Una puntuación cercana a cero indica una ausencia casi total de relación o coincidencia entre la consulta del usuario y el contenido (o título) del libro.
 
-```python
-vectorizador = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5))
-```
 
-Así se comparan pedazos de 3 a 5 letras en vez de palabras completas, y la búsqueda aguanta plurales y errores de tipeo. Lo probamos con el mismo `libros.csv`:
+**Pregunta 6 (2 pts). ¿Qué limitación tiene buscar solo por palabras presentes en títulos mediante TF-IDF? Proponga una mejora
+concreta.**
 
-- `story` encuentra "Sapiens: A Brief History of Humankind" (0.2875) y "Mesaerion: The Best Science Fiction Stories" (0.1387)
-- `lif` encuentra los 3 títulos que tienen "Life"
+A principal limitación de buscar solo por palabras presentes en títulos mediante TF-IDF es la falta de comprensión semántica. 
+Al basarse estrictamente en la coincidencia exacta de palabras. Por ejemplo si se busca como "novelas de amor" el libro "Relatos de amor de verano"
+podria no presentarse con puntuacion 0
 
-El problema es que también encuentra cosas que no tienen que ver, como "story" con "History". Se podría complementar usando `stop_words="english"` para que palabras como "the" no cuenten, agregando la descripción o la categoría de cada libro al índice, o usando embeddings para que encuentre sinónimos.
+Como propuesta se pueden por ejemplo expandir los datos, basandose no solo en el titulo si no en Titulo + Descripcion + Genero.
+Tambien existen los algoritmos de combinacion que usan como parametros las Similitud TF-IDF y Similitud de embeddings.
+

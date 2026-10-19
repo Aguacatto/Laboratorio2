@@ -4,7 +4,9 @@ Extracción de la primera página del catálogo <https://books.toscrape.com/>, l
 
 ## Integrantes
 
-- _Completar con el nombre de cada integrante_
+- Vicente Palma
+- Diego Alvarado
+- Lucas Pinto
 
 ## Repositorio
 

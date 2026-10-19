@@ -1,6 +1,4 @@
-# Laboratorio 2: Web Scraping, procesamiento y recuperación de información
-
-Extracción de la primera página del catálogo <https://books.toscrape.com/>, limpieza y estructuración con Pandas, y un buscador de títulos con TF-IDF y similitud del coseno.
+# Laboratorio 2 - Web Scraping, procesamiento y recuperación de información
 
 ## Integrantes
 
@@ -10,103 +8,88 @@ Extracción de la primera página del catálogo <https://books.toscrape.com/>, l
 
 ## Repositorio
 
-<https://github.com/Aguacatto/Laboratorio2>
+https://github.com/Aguacatto/Laboratorio2
 
-## Estructura
+## Archivos
+
+- `scraper.py`: scraping de la primera página de books.toscrape.com
+- `procesamiento.py`: pasa los datos a un DataFrame, los limpia y genera `libros.csv`
+- `buscador.py`: buscador de títulos con TF-IDF y similitud del coseno
+- `libros.csv`: los datos ya procesados
+- `requirements.txt`: librerías del entorno
+- `.gitignore`: para no subir la carpeta `.venv/`
+
+## Entorno virtual
+
+Lo hicimos en Windows con PowerShell y Python 3.14.3.
+
+Crear el entorno:
 
 ```
-laboratorio2/
-├── scraper.py          # Parte I: extracción con requests + BeautifulSoup
-├── procesamiento.py    # Parte II: DataFrame, limpieza y exportación a libros.csv
-├── buscador.py         # Parte III: índice TF-IDF y búsqueda por similitud del coseno
-├── libros.csv          # Datos procesados (generados por procesamiento.py)
-├── requirements.txt    # Dependencias congeladas con pip freeze
-├── README.md
-└── .gitignore          # Excluye .venv/ (no se versiona)
-```
-
----
-
-## 0. Preparación del entorno virtual
-
-Comandos ejecutados (Windows, PowerShell, Python 3.14.3):
-
-```powershell
-# Paso 0.1: crear el entorno virtual dentro de la carpeta del proyecto
 py -m venv .venv
+```
 
-# Paso 0.2: activar el entorno (comando usado en este laboratorio)
+Activarlo (este es el comando que usamos):
+
+```
 .venv\Scripts\Activate.ps1
+```
 
-# Paso 0.3: verificar que el intérprete pertenece al entorno virtual
+En CMD sería `.venv\Scripts\activate.bat`.
+
+Para comprobar que el python es el del entorno:
+
+```
 python -c "import sys; print(sys.executable)"
-# -> C:\Users\lucas\Documents\GitHub\Laboratorio2\.venv\Scripts\python.exe
+```
 
+Nos salió `C:\Users\lucas\Documents\GitHub\Laboratorio2\.venv\Scripts\python.exe`, así que estaba bien.
+
+Instalar las librerías:
+
+```
 python -m pip install --upgrade pip
 python -m pip install requests beautifulsoup4 pandas scikit-learn
 python -m pip freeze > requirements.txt
 ```
 
-Otras formas de activar el entorno:
+Nota: en PowerShell el `>` guarda el archivo en UTF-16, por eso el requirements lo generamos con `python -m pip freeze | Out-File -Encoding ascii requirements.txt` para que quedara como texto normal. El contenido es el mismo.
 
-| Terminal | Comando |
-|---|---|
-| Windows PowerShell | `.venv\Scripts\Activate.ps1` |
-| Windows CMD | `.venv\Scripts\activate.bat` |
-| Git Bash | `source .venv/Scripts/activate` |
-| Linux / macOS | `source .venv/bin/activate` |
+En el `.gitignore` pusimos la línea `.venv/`. Con `git status --short --ignored` la carpeta aparece como `!! .venv/`, o sea ignorada, así que no se sube al repositorio.
 
-> En PowerShell 5.1 el operador `>` guarda en UTF-16. Para que `requirements.txt` quede en texto plano se generó con `python -m pip freeze | Out-File -Encoding ascii requirements.txt` (mismo contenido).
-
-**Paso 0.4: `.gitignore`.** Contiene la línea `.venv/` (además de `__pycache__/` y `*.pyc`). Se comprobó con `git status --short --ignored` que Git no incluye el entorno:
+## Cómo ejecutarlo desde cero (Paso 14)
 
 ```
-?? .gitignore
-?? requirements.txt
-!! .venv/
-```
-
-## Reproducir la ejecución desde un entorno virtual nuevo (Paso 14)
-
-```powershell
 git clone https://github.com/Aguacatto/Laboratorio2.git
 cd Laboratorio2
-py -m venv .venv                      # Linux/macOS: python3 -m venv .venv
-.venv\Scripts\Activate.ps1            # Linux/macOS: source .venv/bin/activate
-python -m pip install --upgrade pip
+py -m venv .venv
+.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 ```
 
-### Orden de ejecución
+Orden de ejecución:
 
-```powershell
-python scraper.py         # 1. (opcional) prueba la extracción: total y primeros 5 registros
-python procesamiento.py   # 2. hace el scraping, limpia los datos y genera libros.csv
-python buscador.py        # 3. pide una consulta y muestra los libros más similares
-```
+1. `python scraper.py` (opcional, es para ver que la extracción funciona)
+2. `python procesamiento.py` (hace el scraping, limpia los datos y genera `libros.csv`)
+3. `python buscador.py` (pide una palabra y muestra los libros encontrados)
 
-`procesamiento.py` importa `obtener_libros()` desde `scraper.py`. El scraping de `scraper.py` está protegido por `if __name__ == "__main__":`, así que importar el módulo no vuelve a hacer la petición. `buscador.py` solo necesita `libros.csv`.
+`procesamiento.py` importa `obtener_libros()` desde `scraper.py`. Como el scraper tiene el `if __name__ == "__main__":`, al importarlo no se vuelve a ejecutar todo solo.
 
----
+## Parte I - Web Scraping
 
-## I. Extracción mediante Web Scraping (`scraper.py`)
+En `scraper.py` se hace `requests.get(URL, timeout=10)`, se revisa el código de respuesta con `raise_for_status()` y el HTML se analiza con BeautifulSoup. Solo se usa la primera página, sin paginación.
 
-Se pide **solo la primera página** con `requests.get(URL, timeout=10)` y se comprueba el código con `raise_for_status()`. Luego se analiza el HTML con `BeautifulSoup(respuesta.text, "html.parser")`.
+Revisando la página con el inspector del navegador sacamos los selectores:
 
-Selectores obtenidos inspeccionando el HTML con las herramientas del navegador:
+- cada libro está en un `article.product_pod`
+- título: el atributo `title` del `h3 a` (el texto del link viene cortado, por ejemplo "A Light in the ...")
+- precio: `p.price_color`, y se pasa a float
+- disponibilidad: `p.availability`
+- calificación: viene como clase en `p.star-rating` (por ejemplo `star-rating Three`), y con un diccionario la pasamos a un número del 1 al 5
 
-| Campo | Selector / atributo | Transformación |
-|---|---|---|
-| Contenedor de cada libro | `article.product_pod` | |
-| `titulo` | atributo `title` de `h3 a` (el texto visible viene truncado, por ejemplo "A Light in the ...") | `strip()` |
-| `precio` | `p.price_color` (texto `£51.77`) | regex `\d+(?:\.\d+)?` y luego `float` |
-| `disponibilidad` | `p.availability` | se juntan los espacios y saltos de línea: `In stock` |
-| `calificacion` | segunda clase de `p.star-rating` (`One` … `Five`) | diccionario a entero de 1 a 5 |
+Un problema que tuvimos es que el precio salía como `Â£51.77`, porque la página no dice qué codificación usa. Lo arreglamos con `respuesta.encoding = "utf-8"` y además sacamos el número con una expresión regular, así el símbolo de la moneda no molesta.
 
-Notas:
-
-- El servidor no declara `charset`, por lo que `requests` decodificaba el `£` como `Â£`. Se fuerza `respuesta.encoding = "utf-8"` y, además, el precio se extrae con una expresión regular que ignora el símbolo de moneda.
-- **Gestión de elementos sin datos (Paso 4).** Cada campo se extrae con una función propia que retorna `None` si la etiqueta o el valor no existe, en lugar de lanzar `AttributeError`. Si un libro tiene campos faltantes, se imprime `Aviso: el libro N no tiene: ...` y el registro se guarda igual (con `None`). Si un libro produce un error inesperado, se informa y se pasa al siguiente con `continue`. La ejecución nunca se detiene por un elemento incompleto. En la ejecución real no apareció ningún aviso: los 20 libros tenían los cuatro campos.
+**Datos faltantes (Paso 4):** cada campo se saca con una función que devuelve `None` si no encuentra el elemento, así el programa no se cae. Si a un libro le falta algo se imprime un aviso y el libro se guarda igual con ese campo en `None`. Si un libro da otro error, se avisa y se sigue con el siguiente. En nuestra ejecución no salió ningún aviso, los 20 libros tenían todos los datos.
 
 Salida de `python scraper.py`:
 
@@ -121,9 +104,9 @@ Primeros cinco registros:
 {'titulo': 'Sapiens: A Brief History of Humankind', 'precio': 54.23, 'disponibilidad': 'In stock', 'calificacion': 5}
 ```
 
-## II. Procesamiento y estructuración (`procesamiento.py`)
+## Parte II - Procesamiento
 
-Se construye el DataFrame con `pd.DataFrame(libros)` y se verifica (Paso 5.4):
+En `procesamiento.py` se arma el DataFrame con `pd.DataFrame(libros)` y se revisa con `head()`, `info()` y `shape`:
 
 ```
                                   titulo  precio disponibilidad  calificacion
@@ -148,14 +131,16 @@ None
 Columnas presentes: ['titulo', 'precio', 'disponibilidad', 'calificacion']
 ```
 
-**Paso 6: limpieza.**
+Tiene las 4 columnas que se pedían: titulo, precio, disponibilidad y calificacion.
 
-- Se retiran los espacios sobrantes de `titulo` (`str.strip()` y espacios internos repetidos) y de `disponibilidad`.
-- Se eliminan duplicados por título con `drop_duplicates(subset="titulo")`. Resultado: `Duplicados eliminados: 0`.
-- Se crea `titulo_normalizado` en minúsculas (`str.lower()`).
-- Se verifican los tipos numéricos con `pd.to_numeric`: `precio` queda como `float64` y `calificacion` como `Int64`.
+Limpieza (Paso 6):
 
-**Paso 7: indicadores y exportación.** Se exporta `libros.csv` con `index=False` y `encoding="utf-8"`. Columnas: `titulo, precio, disponibilidad, calificacion, titulo_normalizado`.
+- se sacan los espacios de más en `titulo` y `disponibilidad`
+- se eliminan los duplicados por título (no había ninguno: `Duplicados eliminados: 0`)
+- se crea `titulo_normalizado` con el título en minúsculas
+- con `pd.to_numeric` se verifica que `precio` sea float y `calificacion` entero
+
+Después se calculan los indicadores y se exporta `libros.csv` sin índice y en UTF-8 (Paso 7):
 
 ```
 Cantidad de libros: 20
@@ -163,13 +148,15 @@ Precio promedio: 38.05
 Archivo libros.csv exportado.
 ```
 
-## III. Recuperación de información (`buscador.py`)
+## Parte III - Buscador
 
-`buscador.py` contiene el código entregado en el Paso 10. Carga `libros.csv`, descarta los títulos vacíos y ajusta `TfidfVectorizer` sobre `titulo_normalizado`, lo que da una matriz de 20 títulos × 90 términos. Después calcula la similitud del coseno de la consulta contra cada título y muestra hasta `top_k` resultados con puntuación mayor que 0, de mayor a menor.
+`buscador.py` tiene el código que venía en el Paso 10. Lee `libros.csv`, crea el índice TF-IDF con la columna `titulo_normalizado` (quedaron 90 palabras en el vocabulario) y muestra hasta 5 libros con similitud mayor a 0, de mayor a menor.
 
-### Paso 11: dos consultas con palabras observadas en los títulos
+### Paso 11: dos consultas
 
-**Consulta 1: `life`**
+Probamos con `life` y con `the`, que son palabras que vimos en los títulos.
+
+`life`:
 
 ```
 Ingrese una palabra o titulo: life
@@ -178,7 +165,7 @@ The Coming Woman: A Novel Based on the Life of the Infamous Feminist, Victoria W
 Our Band Could Be Your Life: Scenes from the American Indie Underground, 1981-1991 | Precio: 57.25 | Similitud: 0.2231
 ```
 
-**Consulta 2: `the`**
+`the`:
 
 ```
 Ingrese una palabra o titulo: the
@@ -189,12 +176,14 @@ The Requiem Red | Precio: 22.65 | Similitud: 0.3282
 Tipping the Velvet | Precio: 53.74 | Similitud: 0.3282
 ```
 
-**Comparación del orden.**
+Comparando el orden:
 
-- Con `life`, los 3 títulos que contienen la palabra la tienen una sola vez. Gana *Scott Pilgrim's...* porque tiene menos términos distintos (5, contra 12 y 14 de los otros), así que al normalizar el vector "life" pesa más. Los otros dos son títulos largos, con puntuaciones casi iguales (0.2250 y 0.2231).
-- Con `the`, el término aparece en 10 de los 20 títulos y el límite `top_k=5` deja ver solo 5. El orden lo decide la frecuencia del término: *The Coming Woman...* y *The Boys in the Boat...* contienen "the" 3 veces cada uno. Gana el primero porque tiene menos palabras (14 contra 18), así que "the" pesa más en su vector. Los tres siguientes empatan en 0.3282: son títulos de 3 palabras y sus otras dos palabras aparecen una sola vez en la colección. Que una palabra vacía como "the" genere un ranking muestra que el buscador mide coincidencia de palabras, no relevancia real (ver Pregunta 6).
+- Con `life` salen los 3 títulos que tienen esa palabra, y cada uno la tiene una sola vez. Primero sale el de Scott Pilgrim porque tiene menos palabras distintas (5, contra 12 y 14 de los otros), entonces "life" pesa más en ese título. Los otros dos quedan casi iguales.
+- Con `the` hay 10 títulos que la tienen, pero solo se muestran 5 por el `top_k=5`. "The Coming Woman" y "The Boys in the Boat" tienen "the" 3 veces cada uno, y gana el primero porque es más corto (14 palabras contra 18). Los otros tres empatan en 0.3282 porque son títulos de 3 palabras. Esto muestra que el buscador solo cuenta palabras y no sabe qué es relevante, porque "the" no aporta nada a la búsqueda.
 
-**Desafío: `buscar(consulta, top_k=3)`.** Se cambió temporalmente la línea `resultados = buscar(consulta)` por `resultados = buscar(consulta, top_k=3)` y se volvió a ejecutar:
+### Desafío: top_k=3
+
+Cambiamos `resultados = buscar(consulta)` por `resultados = buscar(consulta, top_k=3)` y probamos con `the`:
 
 ```
 Ingrese una palabra o titulo: the
@@ -203,20 +192,20 @@ The Boys in the Boat: Nine Americans and Their Epic Quest for Gold at the 1936 B
 The Black Maria | Precio: 52.15 | Similitud: 0.3282
 ```
 
-Con `the` (10 coincidencias posibles) devolvió exactamente 3 resultados, todos con similitud positiva. Con `life` (solo 3 coincidencias) devolvió los mismos 3 de antes. Se comprueba que el máximo es 3. Después se restauró la llamada original del Paso 10.
+Salieron solo 3 aunque había 10 coincidencias, todos con similitud positiva, así que funciona. Con `life` salieron los mismos 3 de antes porque solo hay 3 títulos con esa palabra. Después dejamos la llamada como estaba en el código original.
 
-## IV. Validación: casos de prueba (Paso 12)
+## Parte IV - Pruebas (Paso 12)
 
-Cada prueba se ejecutó con el entorno virtual activo, corriendo `python buscador.py` y entregando la consulta por la entrada estándar (`printf '<consulta>\n' | python buscador.py` en Git Bash, equivalente a escribirla en el prompt). En los cuatro casos el proceso terminó con código de salida 0, sin excepciones.
+Ejecutamos `python buscador.py` con el entorno activado. Para hacerlo más rápido le pasamos la consulta con `printf` desde Git Bash (por ejemplo `printf 'life\n' | python buscador.py`), que es lo mismo que escribirla en la terminal. Ninguna prueba tiró error.
 
 | Caso | Consulta utilizada | Resultado observado | Estado |
 |---|---|---|---|
-| T1 | `life` | Se recuperaron 3 libros con similitud positiva, ordenados de mayor a menor: *Scott Pilgrim's Precious Little Life* (0.2459), *The Coming Woman...* (0.2250), *Our Band Could Be Your Life...* (0.2231). | Cumple |
-| T2 | `zzxyz123` | Se mostró «No se encontraron coincidencias.» | Cumple |
-| T3 | `LIFE` | Se obtuvo el mismo ranking que en T1: mismos 3 libros, mismo orden y mismas puntuaciones (0.2459, 0.2250, 0.2231). | Cumple |
-| T4 | [vacía] | Se mostró «Ingrese una consulta no vacia.» seguido de «No se encontraron coincidencias.», sin excepción. | Cumple |
+| T1 | life | Salieron 3 libros con similitud positiva y ordenados de mayor a menor: Scott Pilgrim's Precious Little Life (0.2459), The Coming Woman (0.2250) y Our Band Could Be Your Life (0.2231). | Cumple |
+| T2 | zzxyz123 | Se mostró «No se encontraron coincidencias.» | Cumple |
+| T3 | LIFE | Salió el mismo ranking que en T1, con los mismos libros, orden y puntajes. | Cumple |
+| T4 | [vacía] | Se mostró «Ingrese una consulta no vacia.» y después «No se encontraron coincidencias.», sin error. | Cumple |
 
-Salidas completas:
+Salidas:
 
 ```
 # T1
@@ -241,95 +230,72 @@ Ingrese una consulta no vacia.
 No se encontraron coincidencias.
 ```
 
-### Problemas detectados
+### Problemas que encontramos
 
-1. **Mensaje redundante en T4.** `buscar()` imprime «Ingrese una consulta no vacia.» y retorna `[]`. Luego el bloque principal ve la lista vacía e imprime también «No se encontraron coincidencias.». No es un error (hay mensaje informativo y no hay excepción), pero el segundo mensaje sobra. Se corregiría revisando si la consulta está vacía en el bloque principal antes de llamar a `buscar()`.
-2. **Empates en el ranking.** En la consulta `the`, tres títulos tienen exactamente 0.3282. El orden entre ellos lo decide `argsort()` y no responde a ningún criterio de relevancia.
-3. **Entrada por tubería en PowerShell 5.1.** Al probar T4 con `"" | python buscador.py`, PowerShell antepone el carácter invisible BOM (`U+FEFF`). `str.strip()` no lo elimina, así que la consulta no se detectaba como vacía y solo se mostraba «No se encontraron coincidencias.». Escribiendo la consulta a mano en la terminal, o con `printf` en Git Bash, el comportamiento es el esperado (tabla anterior). El código no tiene la falla. Es un efecto de cómo PowerShell envía el texto, pero conviene saberlo al automatizar pruebas.
+- En T4 salen dos mensajes. `buscar()` imprime «Ingrese una consulta no vacia.» y devuelve una lista vacía, y después el main imprime «No se encontraron coincidencias.» porque ve la lista vacía. Igual cumple, pero el segundo mensaje sobra. Se podría arreglar revisando si la consulta está vacía antes de llamar a `buscar()`.
+- Con `the` hay tres libros empatados en 0.3282. El orden entre esos tres lo decide `argsort()`, no tiene que ver con cuál es más relevante.
+- La primera vez probamos T4 en PowerShell con `"" | python buscador.py` y no salía el mensaje de consulta vacía. Revisando vimos que PowerShell agrega un carácter invisible (BOM) al principio del texto, y como `strip()` no lo borra, la consulta no quedaba vacía. Escribiendo la consulta a mano o usando Git Bash funciona bien, así que no es un problema del código.
 
-## Paso 13: evidencias
+## Paso 13 - Evidencias
 
-- **Cantidad de libros extraídos:** 20 (primera página, sin duplicados).
-- **Precio promedio:** £38.05 (mínimo £13.99, máximo £57.25).
-- **Ejemplo de búsqueda 1:** `life` → 3 resultados (ver T1).
-- **Ejemplo de búsqueda 2:** `scott pilgrim`
+- Libros extraídos: 20
+- Precio promedio: £38.05 (el más barato cuesta £13.99 y el más caro £57.25)
+- Búsqueda 1: `life` (es la misma de T1)
+- Búsqueda 2: `scott pilgrim`
 
 ```
 Ingrese una palabra o titulo: scott pilgrim
 Scott Pilgrim's Precious Little Life (Scott Pilgrim #1) | Precio: 52.29 | Similitud: 0.8770
 ```
 
-Con dos términos que solo aparecen en ese título, y "scott" y "pilgrim" repetidos dos veces en él, la similitud sube a 0.8770. Una sola palabra común como `life` llega apenas a 0.2459.
+Acá la similitud es 0.8770, mucho más alta que con `life`, porque las dos palabras solo están en ese título y además aparecen dos veces.
 
----
-
-## Respuestas
+## Preguntas
 
 ### Pregunta 1: ¿Para qué sirve BeautifulSoup y cómo se diferencia de requests?
 
-`requests` es un cliente HTTP. Hace la petición al servidor (GET), maneja el `timeout`, los encabezados y el código de estado, y entrega el contenido como texto (`respuesta.text`). No entiende la estructura del HTML: para `requests` es solo una cadena de caracteres.
-
-`BeautifulSoup` es un analizador (parser) de HTML/XML. Toma ese texto y construye un árbol navegable de etiquetas, que se puede recorrer y consultar con `find`, `select` y `select_one`, por etiqueta, clase o atributo. Así se extrae, por ejemplo, el atributo `title` de `h3 a` o la clase de `p.star-rating`. BeautifulSoup no descarga nada.
-
-En resumen, `requests` **obtiene** la página y `BeautifulSoup` la **interpreta**. Se usan juntos.
+requests sirve para hacer la petición HTTP a la página y traer el HTML (con timeout, código de estado, etc.), pero lo trae como un texto, no entiende la estructura de la página. BeautifulSoup sirve para analizar ese HTML y armar un árbol donde se pueden buscar etiquetas por clase o atributo, con `find`, `select` o `select_one`. O sea, requests descarga la página y BeautifulSoup la lee para sacar los datos. Por eso se usan juntos.
 
 ### Pregunta 2: ¿Qué riesgo existe al depender de selectores HTML específicos si el sitio cambia?
 
-El scraper queda acoplado a la estructura actual de la página. Si el sitio renombra clases (por ejemplo `price_color`), cambia etiquetas o reorganiza el HTML, los selectores dejan de encontrar elementos. Puede pasar lo siguiente:
-
-- `select_one` retorna `None` y el código falla con `AttributeError` al hacer `.get_text()`.
-- `select` retorna una lista vacía y se extraen 0 libros sin que haya un error visible.
-- **Lo más peligroso:** el selector sigue encontrando algo, pero es otro dato, y se guardan valores incorrectos sin aviso.
-
-Como es un fallo silencioso, hay que validar. En este laboratorio cada campo retorna `None` si no existe, se imprime un aviso por libro incompleto y se revisan el total y los primeros registros. Otras mitigaciones: preferir atributos estables, centralizar los selectores, probar el scraper periódicamente o usar una API oficial si existe.
+Si el sitio cambia el nombre de una clase o la estructura del HTML, los selectores dejan de encontrar los elementos. Puede pasar que el programa se caiga (por ejemplo un `AttributeError` al hacer `.get_text()` sobre `None`), que no se extraiga ningún libro y no salga ningún error, o lo peor, que el selector encuentre otra cosa y se guarden datos malos sin que nadie se dé cuenta. Por eso en el scraper manejamos los `None`, mostramos avisos y revisamos el total y los primeros registros. También ayudaría tener los selectores en un solo lugar para cambiarlos fácil, o usar una API si el sitio tiene una.
 
 ### Pregunta 3: ¿Por qué normalizar los títulos antes de implementar la búsqueda?
 
-Para que el mismo término escrito de distintas formas se trate como una sola palabra. Sin normalizar, "Life", "life" y "LIFE" o un título con espacios extra podrían quedar como entradas distintas del vocabulario, y una consulta no encontraría títulos que sí la contienen. Además, la consulta se normaliza igual (`strip().lower()`), así que ambos lados quedan comparables. Eso es lo que verifica T3: `LIFE` y `life` producen el mismo ranking.
+Para que una misma palabra escrita de distinta forma se tome como la misma. Si no se normaliza, "Life" y "life", o un título con espacios de más, podrían quedar como términos distintos y la búsqueda no encontraría títulos que sí tienen la palabra. Como la consulta también se pasa a minúsculas en `buscar()`, los dos lados quedan iguales, y eso es lo que se ve en T3 (`LIFE` da lo mismo que `life`). TfidfVectorizer igual pasa todo a minúsculas por defecto, pero tener la columna normalizada deja el proceso más claro y no depende de esa opción. El título original queda en `titulo` para mostrarlo en los resultados.
 
-Un campo `titulo_normalizado` explícito también hace el proceso reproducible e independiente de la herramienta. Por defecto `TfidfVectorizer` ya pasa a minúsculas, pero no hay que depender de esa opción. La normalización también ayuda a detectar duplicados y a descartar títulos vacíos antes de construir el índice. El título original se conserva en `titulo` para mostrarlo en los resultados.
+### Pregunta 4: ¿Qué función cumple fit_transform() sobre los títulos y por qué se usa transform() para la consulta?
 
-### Pregunta 4: ¿Qué función cumple `fit_transform()` sobre los títulos y por qué se usa `transform()` para la consulta?
+`fit_transform()` hace dos cosas con los títulos. El fit aprende el vocabulario (cada palabra distinta es una columna, en nuestro caso 90) y calcula el IDF de cada palabra según en cuántos títulos aparece. El transform convierte cada título en su vector TF-IDF. Así queda la matriz de 20 x 90.
 
-`fit_transform()` hace dos cosas sobre la colección de títulos:
-
-1. **fit:** aprende el vocabulario (cada término distinto pasa a ser una columna, 90 en este caso) y calcula el IDF de cada término según en cuántos títulos aparece.
-2. **transform:** convierte cada título en su vector TF-IDF. El resultado es `matriz_tfidf`, de 20 × 90.
-
-Para la consulta se usa solo `transform()`, para representarla **en el mismo espacio vectorial** que los títulos: el mismo vocabulario, el mismo orden de columnas y los mismos pesos IDF aprendidos de la colección. Solo así tiene sentido compararla con `cosine_similarity`. Si se hiciera `fit_transform()` con la consulta, se aprendería un vocabulario nuevo de una sola frase. Las dimensiones no coincidirían con la matriz (o la comparación no tendría sentido) y se perdería el IDF de la colección. Los términos que no están en el vocabulario simplemente se ignoran: `zzxyz123` produce un vector de ceros, y por eso T2 no tiene coincidencias.
+Para la consulta se usa solo `transform()` porque tiene que quedar en el mismo espacio que los títulos, con el mismo vocabulario y los mismos IDF, si no no se pueden comparar con la similitud del coseno. Si usáramos `fit_transform()` con la consulta, se crearía un vocabulario nuevo solo con esas palabras y las dimensiones no calzarían con la matriz. Las palabras que no están en el vocabulario se ignoran, por eso `zzxyz123` queda como un vector de puros ceros y no encuentra nada (T2).
 
 ### Pregunta 5: Si dos libros obtienen similitudes de 0.75 y 0.20 para la misma consulta, ¿cuál se muestra primero? ¿Qué indica una puntuación cercana a cero?
 
-Se muestra primero el de **0.75**. Las puntuaciones se ordenan de mayor a menor con `argsort()[::-1]`, así que el título más similar a la consulta aparece arriba. En T1 pasa lo mismo: 0.2459 aparece antes que 0.2250.
+Primero se muestra el de 0.75, porque los resultados se ordenan de mayor a menor similitud (`argsort()[::-1]`). En T1 pasa lo mismo, el de 0.2459 sale antes que el de 0.2250.
 
-Una puntuación **cercana a cero** indica que el título comparte muy poco con la consulta. Puede compartir solo un término poco distintivo o tener ese término "diluido" entre muchas otras palabras, así que es una coincidencia débil y poco relevante. Una puntuación **igual a 0** significa que no comparten ningún término del vocabulario. El código descarta esos casos (`if puntuaciones[i] <= 0: break`). La medida es léxica: una puntuación baja no dice que los significados sean distintos, solo que comparten pocas palabras.
+Una puntuación cercana a cero significa que el título tiene muy poco en común con la consulta, por ejemplo comparte una palabra poco importante o la palabra queda "diluida" en un título muy largo. Si es exactamente 0 es porque no comparten ninguna palabra, y el código no muestra esos resultados (`if puntuaciones[i] <= 0: break`). Eso sí, esto es solo por palabras: un puntaje bajo no quiere decir que el significado sea distinto.
 
 ### Pregunta 6: ¿Qué limitación tiene buscar solo por palabras presentes en títulos mediante TF-IDF? Proponga una mejora concreta.
 
-La búsqueda solo encuentra **coincidencias exactas de palabras** en textos muy cortos. No entiende significado ni variantes. Lo comprobamos con los datos reales:
+La limitación es que solo encuentra palabras exactas, y los títulos tienen pocas palabras. No reconoce plurales, errores de tipeo, sinónimos ni otros idiomas. Lo probamos con nuestros datos:
 
-| Consulta | Qué se esperaría | Resultado actual |
-|---|---|---|
-| `story` | *Mesaerion: The Best Science Fiction **Stories**...* | «No se encontraron coincidencias.» (singular ≠ plural) |
-| `lif` (error de tipeo) | Los títulos con "Life" | «No se encontraron coincidencias.» |
-| `vida` (otro idioma / sinónimo) | Los títulos con "Life" | «No se encontraron coincidencias.» |
-| `the` (palabra vacía) | Nada útil | Puntuaciones altas (0.41) para títulos con muchos "the" |
+- `story` no encuentra "Mesaerion: The Best Science Fiction Stories" (singular contra plural)
+- `lif` (mal escrito) no encuentra los títulos con "Life"
+- `vida` no encuentra nada, aunque hay títulos con "Life"
+- `the` sí da resultados con puntajes altos, aunque es una palabra que no dice nada
 
-Además, un título tiene pocas palabras. Un libro relevante cuyo título no contiene el término de búsqueda (porque el tema está en su descripción o categoría) nunca aparece.
+Además, si un libro trata de algo pero no lo dice en el título, nunca va a aparecer en la búsqueda.
 
-**Mejora concreta: vectorizar por n-gramas de caracteres.**
+Mejora: usar n-gramas de caracteres en el vectorizador.
 
 ```python
 vectorizador = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5))
 ```
 
-Así se indexan trozos de 3 a 5 letras dentro de cada palabra en vez de palabras completas, y la búsqueda tolera plurales, palabras parciales y errores de tipeo. Se probó sobre el mismo `libros.csv`:
+Así se comparan pedazos de 3 a 5 letras en vez de palabras completas, y la búsqueda aguanta plurales y errores de tipeo. Lo probamos con el mismo `libros.csv`:
 
-- `story` → *Sapiens: A Brief Hi**story** of Humankind* (0.2875) y *Mesaerion: The Best Science Fiction **Stor**ies...* (0.1387). Antes no había resultados.
-- `lif` → los 3 títulos con "Life" (0.1261, 0.1017, 0.1008). Antes no había resultados.
+- `story` encuentra "Sapiens: A Brief History of Humankind" (0.2875) y "Mesaerion: The Best Science Fiction Stories" (0.1387)
+- `lif` encuentra los 3 títulos que tienen "Life"
 
-Desventaja: aparecen coincidencias parciales poco deseadas ("story" encuentra "History"). Por eso conviene combinarla con estas otras mejoras:
-
-- `stop_words="english"` en el análisis por palabras, para que "the" no influya.
-- Indexar también la categoría y la descripción de cada libro (desde su página de detalle).
-- Para sinónimos u otros idiomas ("vida" → "life"), usar embeddings semánticos en lugar de TF-IDF.
+El problema es que también encuentra cosas que no tienen que ver, como "story" con "History". Se podría complementar usando `stop_words="english"` para que palabras como "the" no cuenten, agregando la descripción o la categoría de cada libro al índice, o usando embeddings para que encuentre sinónimos.
